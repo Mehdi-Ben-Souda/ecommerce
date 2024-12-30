@@ -1,0 +1,128 @@
+version: '3.8'
+
+services:
+  # Cart service configuration
+  # cartservice:
+  #   build:
+  #     context: ./CartMicroservice/CartMicroservice
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "7122:80"
+  #   environment:
+  #     - ASPNETCORE_ENVIRONMENT=Development
+  #   depends_on:
+  #     - redis
+  #   networks:
+  #     - cart-network
+  #     - kafka-net
+
+  # Cart service configuration
+  catalogservice:
+    build:
+      context: ./CatalogMicroservice/CatalogMicroservice
+      dockerfile: Dockerfile
+    container_name: catalogMicroService
+    ports:
+      - "7122:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      - mongo
+    networks:
+      - catalog-network
+      - shared-network
+
+  # Auth service configuration
+  authservice:
+    build:
+      context: ./AuthentificationMicroservice/AuthentificationMicroservice
+      dockerfile: Dockerfile
+    container_name: authentificationMicroservice
+    ports:
+      - "5259:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - catalog-network
+
+  # apigateway:
+  #   build:
+  #     context: ./ApiGateway/ApiGateway
+  #     dockerfile: Dockerfile
+  #   container_name: apiGateway
+  #   ports:
+  #     - "5000:80"
+  #   environment:
+  #     - ASPNETCORE_ENVIRONMENT=Development
+    
+  #   networks:
+  #     - shared-network
+
+  # sqlserver:
+  #   image: "mcr.microsoft.com/mssql/server:2022-latest"
+  #   container_name: sqlServerDB
+  #   environment:
+  #     SA_PASSWORD: "Password123"
+  #     ACCEPT_EULA: "Y"
+  #   ports:
+  #     - "1433:1433"
+  #   networks:
+  #     - authent-network
+
+
+
+  redis:
+    image: redis:latest
+    container_name: redisDB
+    ports:
+      - "6379:6379"
+    networks:
+      - cart-network
+      
+  #nongo container
+  mongo:
+    image: mongo:latest
+    container_name: mongoDB
+    ports:
+      - "27017:27017"
+    networks:
+      - catalog-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeperKafka
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "22181:2181"
+    networks:
+      - kafka-net
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafkaBroker
+    depends_on:
+      - zookeeper
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CREATE_TOPICS: "cart_validation:1:1"
+    networks:
+      - kafka-net
+
+networks:
+  cart-network:
+    driver: bridge
+  kafka-net:
+    driver: bridge
+  catalog-network:
+    driver: bridge
+  shared-network:
+    driver: bridge
