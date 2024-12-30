@@ -6,8 +6,8 @@ namespace CartMicroservice.Models
     public class Cart
     {
         [Key]
-        public int id { get; set; }
-        public int userId { get; set; }
+        public string? id { get; set; }
+        public string? userId { get; set; }
         public double total { get; set; }
         [InverseProperty("Cart")] 
         public ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();

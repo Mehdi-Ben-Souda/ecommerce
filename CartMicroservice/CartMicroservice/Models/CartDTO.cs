@@ -2,8 +2,8 @@
 {
     public class CartDTO
     {
-        public int id { get; set; }
-        public int userId { get; set; }
+        public string? id { get; set; }
+        public string? userId { get; set; }
         public double total { get; set; }
         public ICollection<CartItemDTO> CartItems { get; set; } = new List<CartItemDTO>();
 
