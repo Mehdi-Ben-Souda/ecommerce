@@ -21,7 +21,7 @@ builder.Services.AddStackExchangeRedisCache(options =>
         AbortOnConnectFail = false  // This allows the app to continue even if Redis is temporarily down
     };
     // This is the crucial part - we need to explicitly add the endpoint
-    options.ConfigurationOptions.EndPoints.Add("localhost", 6379);
+    options.ConfigurationOptions.EndPoints.Add("redisDB", 6379);
 
     
 });
@@ -38,7 +38,7 @@ app.MapGet("/", () => "Hello World!");
 
 
 // Get a cart by ID
-app.MapGet("/Carts/{id}", async (int id, [FromServices] IDistributedCache cache) =>
+app.MapGet("/Cart/{id}", async (string id, [FromServices] IDistributedCache cache) =>
 {
     var cartJson = await cache.GetStringAsync($"Cart_{id}");
     if (cartJson == null)
@@ -47,21 +47,59 @@ app.MapGet("/Carts/{id}", async (int id, [FromServices] IDistributedCache cache)
     }
 
     var cart = JsonSerializer.Deserialize<Cart>(cartJson);
+    // for each cartItem in cart, get the product from the product microservice uing the the api endponit
+    // and add it to the cartItem
+    // Create a single HttpClient instance
+    using var httpClient = new HttpClient();
+    httpClient.BaseAddress = new Uri("http://catalogMicroService");
+
+    // Create a list to store our tasks
+    var productTasks = cart.CartItems.Select(async cartItem =>
+    {
+        try
+        {
+            // Make the HTTP request to get the product
+            var response = await httpClient.GetAsync($"/Products/{cartItem.productId}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var productJson = await response.Content.ReadAsStringAsync();
+                return (cartItem, JsonSerializer.Deserialize<Product>(productJson));
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching product {cartItem.productId}: {ex.Message}");
+        }
+        return (cartItem, null);
+    });
+
+    // Wait for all requests to complete
+    var results = await Task.WhenAll(productTasks);
+
+    // Update cart items with their products
+    foreach (var (cartItem, product) in results.Where(r => r.Item2 != null))
+    {
+        // Since we already have the CartItem model set up with a Product property
+        // we can just assign it
+        cartItem.product = product;
+    }
+
     return Results.Ok(cart);
 });
 
 
 // Add a new cart
-app.MapPost("/Carts", async (Cart cart, [FromServices] IDistributedCache cache) =>
+app.MapPost("/Cart", async (Cart cart, [FromServices] IDistributedCache cache) =>
 {
     var cartJson = JsonSerializer.Serialize(cart);
     await cache.SetStringAsync($"Cart_{cart.userId}", cartJson);
 
-    return Results.Created($"/Carts/{cart.userId}", cart);
+    return Results.Created($"/Cart/{cart.userId}", cart);
 });
 
 //Adding a product to a cart
-app.MapPost("/AddToCart", async (CartItem cartItem, [FromServices] IDistributedCache cache) =>
+app.MapPost("/Cart/AddToCart", async (CartItem cartItem, [FromServices] IDistributedCache cache) =>
 {
     var cartJson = await cache.GetStringAsync($"Cart_{cartItem.cartId}");
     if (cartJson == null)
@@ -90,8 +128,8 @@ app.MapPost("/AddToCart", async (CartItem cartItem, [FromServices] IDistributedC
     return Results.Ok(cartItem);
 });
 
-//Removing a product from a cart
-app.MapPost("/RemoveFromCart", async (CartItem cartItem, [FromServices] IDistributedCache cache) =>
+//Updating a product in a cart
+app.MapPut("/Cart/UpdateCart", async (CartItem cartItem, [FromServices] IDistributedCache cache) =>
 {
     var cartJson = await cache.GetStringAsync($"Cart_{cartItem.cartId}");
     if (cartJson == null)
@@ -99,6 +137,36 @@ app.MapPost("/RemoveFromCart", async (CartItem cartItem, [FromServices] IDistrib
         return Results.NotFound("Cart not found");
     }
     var userCart = JsonSerializer.Deserialize<Cart>(cartJson);
+    if (userCart == null)
+    {
+        return Results.NotFound("Cart Empty ( not instanciated )");
+    }
+
+    var existingItem = userCart.CartItems.FirstOrDefault(i => i.productId == cartItem.productId);
+    if (existingItem != null)
+    {
+        existingItem.quantity = cartItem.quantity;
+    }
+
+    cartJson = JsonSerializer.Serialize(userCart);
+    await cache.SetStringAsync($"Cart_{userCart.id}", cartJson);
+
+    return Results.Ok(cartItem);
+});
+
+//Removing a product from a cart
+app.MapPost("/Cart/RemoveFromCart", async (CartItem cartItem, [FromServices] IDistributedCache cache) =>
+{
+    var cartJson = await cache.GetStringAsync($"Cart_{cartItem.cartId}");
+    if (cartJson == null)
+    {
+        return Results.NotFound("Cart not found");
+    }
+    var userCart = JsonSerializer.Deserialize<Cart>(cartJson);
+    if (userCart == null)
+    {
+        return Results.NotFound("Cart Empty ( not instanciated )");
+    }
 
     var existingItem = userCart.CartItems.FirstOrDefault(i => i.productId == cartItem.productId);
     if (existingItem != null)
@@ -113,7 +181,7 @@ app.MapPost("/RemoveFromCart", async (CartItem cartItem, [FromServices] IDistrib
 });
 
 //Validate cart ( the cart becomes an order , we publish this in kafka topic and the order microService store the oder)
-app.MapPost("/ValidateCart/{id}", async (int id, [FromServices] IDistributedCache cache, [FromServices] KafkaProducerService kafkaProducerService) =>
+app.MapPost("/Cart/ValidateCart/{id}", async (string id, [FromServices] IDistributedCache cache, [FromServices] KafkaProducerService kafkaProducerService) =>
 {
     var cartJson = await cache.GetStringAsync($"Cart_{id}");
     if (cartJson == null)

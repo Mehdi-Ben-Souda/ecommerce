@@ -1,20 +1,22 @@
 version: '3.8'
 
 services:
-  # Cart service configuration
-  # cartservice:
-  #   build:
-  #     context: ./CartMicroservice/CartMicroservice
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "7122:80"
-  #   environment:
-  #     - ASPNETCORE_ENVIRONMENT=Development
-  #   depends_on:
-  #     - redis
-  #   networks:
-  #     - cart-network
-  #     - kafka-net
+  #Cart service configuration
+  cartservice:
+    build:
+      context: ./CartMicroservice/CartMicroservice
+      dockerfile: Dockerfile
+    container_name: cartMicroService
+    ports:
+      - "7125:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      - redis
+    networks:
+      - cart-network
+      - kafka-net
+      - shared-network
 
   # Cart service configuration
   catalogservice:
@@ -57,17 +59,6 @@ services:
     
   #   networks:
   #     - shared-network
-
-  # sqlserver:
-  #   image: "mcr.microsoft.com/mssql/server:2022-latest"
-  #   container_name: sqlServerDB
-  #   environment:
-  #     SA_PASSWORD: "Password123"
-  #     ACCEPT_EULA: "Y"
-  #   ports:
-  #     - "1433:1433"
-  #   networks:
-  #     - authent-network
 
 
 
