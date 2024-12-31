@@ -16,18 +16,18 @@ var app = builder.Build();
 
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+/*if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
-}
+}*/
 
 app.MapGet("Order/all",(OrderService orderService) =>
 {
     return Results.Ok(orderService.GetOrders());
 });
 
-app.MapGet("Order/{userId}", (OrderService orderService, int userId) =>
+app.MapGet("Order/{userId}", (OrderService orderService, string userId) =>
 {
     return Results.Ok(orderService.GetOrdersByUserId(userId));
 });

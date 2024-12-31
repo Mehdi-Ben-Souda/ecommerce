@@ -9,7 +9,7 @@ namespace OrdersMicroservice.models
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
         public string id { get; set; } = null!;
-        public int costumerId { get; set; }
+        public string costumerId { get; set; }
         public DateTime OrderDate { get; set; }
 
         public double totalPrice { get; set; }

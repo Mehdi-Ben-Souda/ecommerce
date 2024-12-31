@@ -5,7 +5,7 @@ namespace CartMicroservice.Models
 {
     public class CartItemDTO
     {
-        public int productId { get; set; }
+        public string productId { get; set; }
         public int quantity { get; set; } 
 
     }

@@ -20,7 +20,7 @@ namespace OrdersMicroservice.services
         }
 
         //get order by user id
-        public List<Order> GetOrdersByUserId(int userId)
+        public List<Order> GetOrdersByUserId(string userId)
         {
             return _orders.Find(order => order.costumerId == userId).ToList();
         }
